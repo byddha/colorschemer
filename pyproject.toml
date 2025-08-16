@@ -1,0 +1,45 @@
+[project]
+name = "colorschemer"
+version = "1.0.0"
+description = "A tool for recoloring images using color schemes"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.3.2",
+    "pillow>=9.1,<11.0",
+    "requests>=2.32.4",
+    "scikit-learn>=1.7.1",
+    "textual>=1.0.0",
+    "textual-image>=0.5.0",
+    "textual-slider>=0.2.0",
+]
+
+[project.scripts]
+colorschemer = "colorschemer.main:main"
+
+[tool.ruff]
+fix = true
+show-fixes = true
+output-format = "full"
+
+[tool.ruff.lint]
+select = [
+    "ALL"
+]
+ignore = [
+    "D203",      # Incompatible with D211
+    "D213",      # Incompatible with D212  
+    "COM812",    # Conflicts with formatter
+    "BLE001",    # Do not catch blind exceptions
+    "S110",      # Try-except-pass (intentional for UI)
+    "TRY301",    # Abstract raise (overly strict)
+    "RUF012",    # Mutable class attributes (textual pattern)
+]
+
+[tool.setuptools]
+packages = ["colorschemer"]
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+reportExplicitAny = "none"
+reportAny = "none"
+reportMissingTypeStubs = "none"
