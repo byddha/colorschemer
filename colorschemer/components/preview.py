@@ -25,8 +25,9 @@ class Preview(Container):
         image_cache: ImageCache,
         cell_width_px: float,
         cell_height_px: float,
-        **kwargs,
+        **kwargs,  # noqa: ANN003
     ) -> None:
+        """Init the preview thing with cache and cell stuff."""
         self.image_cache = image_cache
         self.current_image: Image.Image | None = None
         self.current_image_widget: Any = None
@@ -37,6 +38,7 @@ class Preview(Container):
         super().__init__(**kwargs)
 
     def compose(self) -> ComposeResult:
+        """Make the UI layout."""
         with Vertical():
             with Container(id="image-container", classes="image-main"):
                 pass
@@ -44,6 +46,7 @@ class Preview(Container):
             yield Settings(id="settings-panel")
 
     def update_image(self, theme_name: str, image: Image.Image) -> None:
+        """Update the displayed image."""
         self.current_image = image
         self.current_theme = theme_name
 
@@ -69,6 +72,7 @@ class Preview(Container):
             image_container.mount(fallback_text)
 
     def on_resize(self, _event: Resize) -> None:
+        """Handle window resize events."""
         if self.current_image and self.current_image_widget:
             self._apply_optimal_sizing(self.current_image)
 

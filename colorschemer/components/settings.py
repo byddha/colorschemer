@@ -16,6 +16,7 @@ class Settings(Container):
     """Settings panel for image processing."""
 
     def __init__(self, **kwargs) -> None:  # noqa: ANN003
+        """Set up settings panel with defaults."""
         self.sampling_size = DEFAULT_SAMPLING_SIZE
         self.color_count = DEFAULT_COLOR_COUNT
         self.max_iterations = DEFAULT_MAX_ITERATIONS
@@ -24,6 +25,7 @@ class Settings(Container):
         super().__init__(**kwargs)
 
     def compose(self) -> ComposeResult:
+        """Build the settings UI."""
         with Vertical():
             with Horizontal(classes="parameter-controls-row"):
                 with Container(classes="parameter-control-group"):

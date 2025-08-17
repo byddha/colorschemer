@@ -7,6 +7,7 @@ from colorschemer.theme_data import ThemeData
 
 
 def create_theme_display(theme_name: str, theme_colors: list[str]) -> str:
+    """Make colored text display for theme."""
     theme_data = ThemeData(theme_name, theme_colors)
     color_blocks = ""
     num_colors = min(len(theme_data.rgb_colors), 16)
@@ -27,12 +28,14 @@ class Themes(OptionList):
     ]
 
     def __init__(self, themes: dict[str, list[str]], **kwargs) -> None:  # noqa: ANN003
+        """Init theme list widget."""
         self.themes = themes
         self.filtered_themes = list(themes.keys())
         self.pending_g = False  # Track if 'g' was pressed for 'gg' sequence
         super().__init__(**kwargs)
 
     def on_mount(self) -> None:
+        """When widget mounts, populate the list."""
         self._populate_list()
 
     def _populate_list(self) -> None:
@@ -42,6 +45,7 @@ class Themes(OptionList):
             self.add_option(Option(display_text, id=theme_name))
 
     def filter_themes(self, query: str) -> None:
+        """Filter themes based on search."""
         old_filtered = self.filtered_themes.copy()
 
         if query:
@@ -55,6 +59,7 @@ class Themes(OptionList):
             self._populate_list()
 
     def get_current_theme(self) -> str | None:
+        """Get selected theme name."""
         if self.highlighted is not None:
             option = self.get_option_at_index(self.highlighted)
             if option and hasattr(option, "id"):
