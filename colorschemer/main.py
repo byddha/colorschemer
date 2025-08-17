@@ -9,10 +9,7 @@ import pathlib
 import sys
 from pathlib import Path
 
-import numpy as np
-from PIL import Image
-
-from .clustering import apply_color_scheme, compute_image_clusters
+from .extractors.factory import ExtractorFactory
 from .launcher import launch_application
 
 os.environ["OMP_NUM_THREADS"] = str(os.cpu_count())
@@ -36,21 +33,15 @@ def load_color_schemes(theme_file: str = "iterm2") -> dict:
         sys.exit(1)
 
 
-def recolor_image(
-    image: Image.Image,
-    color_scheme: np.ndarray,
-    sample_size: int = 50000,
-    n_colors: int = 8,
-) -> Image.Image:
-    """Legacy function for compatibility. Combines clustering and color application."""
-    clustering_data = compute_image_clusters(image, sample_size, n_colors)
-    return apply_color_scheme(clustering_data, color_scheme)
-
-
-def main_interface(image_path: str, color_schemes: dict) -> None:
+def main_interface(
+    image_path: str, color_schemes: dict, method: str = "kmeans"
+) -> None:
     """Launch the main user interface with error handling."""
+    extractor = ExtractorFactory.create_extractor(method)
+    settings = ExtractorFactory.create_settings(method)
+
     with contextlib.suppress(KeyboardInterrupt):
-        launch_application(image_path, color_schemes, recolor_image)
+        launch_application(image_path, color_schemes, extractor, settings)
 
 
 def main() -> None:
@@ -66,6 +57,12 @@ def main() -> None:
         default="iterm2",
         help="Theme file to use (default: iterm2)",
     )
+    parser.add_argument(
+        "--method",
+        choices=ExtractorFactory.get_available_methods(),
+        default="kmeans",
+        help="Color extraction method to use (default: kmeans)",
+    )
     parser.add_argument("--version", action="version", version="colorschemer 1.0.0")
 
     args = parser.parse_args()
@@ -77,7 +74,7 @@ def main() -> None:
 
     color_schemes = load_color_schemes(args.theme_file)
 
-    main_interface(args.image_path, color_schemes)
+    main_interface(args.image_path, color_schemes, args.method)
 
 
 if __name__ == "__main__":

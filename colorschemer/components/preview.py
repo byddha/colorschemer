@@ -11,8 +11,6 @@ from textual_image.widget import Image as ImageWidget
 
 from colorschemer.utils.cache import ImageCache
 
-from .settings import Settings
-
 MAX_IMAGE_WIDTH = 1200
 MAX_IMAGE_HEIGHT = 800
 
@@ -40,10 +38,7 @@ class Preview(Container):
     def compose(self) -> ComposeResult:
         """Make the UI layout."""
         with Vertical():
-            with Container(id="image-container", classes="image-main"):
-                pass
-            yield Static("[bold]2[/bold] Settings", classes="pane-title")
-            yield Settings(id="settings-panel")
+            yield Container(id="image-container", classes="image-main")
 
     def update_image(self, theme_name: str, image: Image.Image) -> None:
         """Update the displayed image."""

@@ -4,7 +4,6 @@ import pathlib
 import subprocess
 import tempfile
 import threading
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from typing import Any
@@ -17,7 +16,6 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import (
     Button,
-    Checkbox,
     Footer,
     Header,
     Input,
@@ -27,12 +25,10 @@ from textual.widgets import (
 )
 from textual_slider import Slider
 
-from colorschemer.clustering import apply_color_scheme, compute_image_clusters
 from colorschemer.utils.cache import ImageCache
 
 from .preview import Preview
 from .search import Search
-from .settings import Settings
 from .themes import Themes
 
 MIN_SAMPLING_SIZE = 1000
@@ -177,23 +173,24 @@ class App(TextualApp):
         ("2", "focus_settings", "Settings"),
     ]
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         image_path: str,
         color_schemes: dict[str, list[str]],
-        color_transformation_function: Callable[[Any, Any, int, int], Any],
+        extractor: Any,  # noqa: ANN401
+        settings: Any,  # noqa: ANN401
         cell_width_px: float,
         cell_height_px: float,
     ) -> None:
         """Initialize the app."""
         self.image_path = image_path
         self.color_schemes = color_schemes
-        self.color_transformation_function = color_transformation_function
+        self.extractor = extractor
+        self.settings_component = settings
         self.cell_width_px = cell_width_px
         self.cell_height_px = cell_height_px
         self.image_cache = ImageCache()
         self.original_image: Image.Image | None = None
-        self.clustering_data = None
         self.search_timer = None
         self.executor = ThreadPoolExecutor(max_workers=2)
         self.processing_lock = threading.Lock()
@@ -206,14 +203,15 @@ class App(TextualApp):
             first_theme = next(iter(color_schemes.values()))
             detected_color_count = len(first_theme)
             self.DEFAULT_COLOR_COUNT = detected_color_count
-
-        self.sampling_size = self.DEFAULT_SAMPLING_SIZE
-        self.color_count = self.DEFAULT_COLOR_COUNT
-        self.max_iterations = self.DEFAULT_MAX_ITERATIONS
-        self.preserve_brightness = self.DEFAULT_PRESERVE_BRIGHTNESS
-        self.random_state = 42
+            self.detected_color_count = detected_color_count
 
         super().__init__()
+
+    def _get_cache_key(self, theme_name: str) -> str:
+        """Generate cache key including extractor and parameters."""
+        params = self.settings_component.get_parameters()
+        extractor_key = self.extractor.get_cache_key(**params)
+        return f"{theme_name}_{extractor_key}"
 
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
@@ -233,11 +231,18 @@ class App(TextualApp):
                     self.cell_height_px,
                     id="image-preview",
                 )
+                yield Static("[bold]2[/bold] Settings", classes="pane-title")
+                self.settings_component.id = "settings-panel"
+                yield self.settings_component
 
         yield Footer()
 
     def on_mount(self) -> None:
         """Set up app on mount."""
+        # Update settings component with detected color count now that widgets exist
+        if hasattr(self, "detected_color_count"):
+            self.settings_component.set_parameters(n_colors=self.detected_color_count)
+
         self.load_original_image()
         theme_list = self.query_one("#theme-list", Themes)
         if theme_list.filtered_themes:
@@ -266,12 +271,6 @@ class App(TextualApp):
             if self.original_image.mode != "RGB":
                 self.original_image = self.original_image.convert("RGB")
 
-            if self.original_image:
-                self.clustering_data = compute_image_clusters(
-                    self.original_image,
-                    sample_size=self.sampling_size,
-                    n_colors=self.color_count,
-                )
         except (requests.RequestException, requests.Timeout) as e:
             self.notify(f"Network error loading image: {e}", severity="error")
         except (FileNotFoundError, OSError) as e:
@@ -283,7 +282,7 @@ class App(TextualApp):
 
     def _process_theme_background(self, theme_name: str) -> None:
         """Process theme in background thread."""
-        if not self.original_image or not self.clustering_data:
+        if not self.original_image:
             return
 
         try:
@@ -295,10 +294,11 @@ class App(TextualApp):
                 dtype=np.float32,
             )
 
-            recolored = apply_color_scheme(
-                self.clustering_data,
+            params = self.settings_component.get_parameters()
+            recolored = self.extractor.recolor_image(
+                self.original_image,
                 color_scheme,
-                preserve_brightness=self.preserve_brightness,
+                **params,
             )
 
             self.call_from_thread(self._update_processed_theme, theme_name, recolored)
@@ -312,7 +312,8 @@ class App(TextualApp):
 
     def _update_processed_theme(self, theme_name: str, image: Image.Image) -> None:
         """Update cache and preview on main thread."""
-        self.image_cache.put(theme_name, image)
+        cache_key = self._get_cache_key(theme_name)
+        self.image_cache.put(cache_key, image)
         # Only update preview if this is still the current theme
         with self.processing_lock:
             if self.current_processing_theme == theme_name:
@@ -321,10 +322,11 @@ class App(TextualApp):
 
     def load_theme_image(self, theme_name: str) -> None:
         """Load theme image."""
-        if not self.original_image or not self.clustering_data:
+        if not self.original_image:
             return
 
-        cached = self.image_cache.get(theme_name)
+        cache_key = self._get_cache_key(theme_name)
+        cached = self.image_cache.get(cache_key)
         if cached:
             preview = self.query_one("#image-preview", Preview)
             preview.update_image(theme_name, cached)
@@ -408,75 +410,18 @@ class App(TextualApp):
         and triggers image recoloring with the new parameters. Provides user
         feedback upon successful completion.
         """
-        try:
-            sample_slider = self.query_one("#sampling-size-control", Slider)
-            colors_slider = self.query_one("#color-count-control", Slider)
-            iter_slider = self.query_one("#max-iterations-control", Slider)
-            brightness_checkbox = self.query_one(
-                "#preserve-brightness-checkbox",
-                Checkbox,
-            )
+        self.settings_component.get_parameters()
 
-            sampling_size = int(sample_slider.value)
-            color_count = int(colors_slider.value)
-            max_iterations = int(iter_slider.value)
-
-            if sampling_size < MIN_SAMPLING_SIZE or sampling_size > MAX_SAMPLING_SIZE:
-                msg = (
-                    f"Sampling size must be between {MIN_SAMPLING_SIZE:,} "
-                    f"and {MAX_SAMPLING_SIZE:,}"
-                )
-                raise ValueError(msg)
-            if color_count < MIN_COLOR_COUNT or color_count > MAX_COLOR_COUNT:
-                msg = (
-                    f"Color count must be between {MIN_COLOR_COUNT} "
-                    f"and {MAX_COLOR_COUNT}"
-                )
-                raise ValueError(msg)
-            if (
-                max_iterations < MIN_MAX_ITERATIONS
-                or max_iterations > MAX_MAX_ITERATIONS
-            ):
-                msg = (
-                    f"Max iterations must be between {MIN_MAX_ITERATIONS} "
-                    f"and {MAX_MAX_ITERATIONS}"
-                )
-                raise ValueError(msg)
-
-            self.sampling_size = sampling_size
-            self.color_count = color_count
-            self.max_iterations = max_iterations
-            self.preserve_brightness = brightness_checkbox.value
-        except ValueError as e:
-            self.notify(f"Invalid settings: {e}", severity="error")
-            return
-        except Exception as e:
-            self.notify(f"Error reading settings: {e}", severity="error")
-            return
-
-        settings_panel = self.query_one("#settings-panel", Settings)
-        settings_panel.sampling_size = self.sampling_size
-        settings_panel.color_count = self.color_count
-        settings_panel.max_iterations = self.max_iterations
-        settings_panel.preserve_brightness = self.preserve_brightness
-
-        if (
-            self.sampling_size != settings_panel.sampling_size
-            or self.color_count != settings_panel.color_count
-        ) and self.original_image:
-            self.clustering_data = compute_image_clusters(
-                self.original_image,
-                sample_size=self.sampling_size,
-                n_colors=self.color_count,
-            )
-            self.image_cache = ImageCache()
+        # Clear cache since settings changed
+        self.image_cache = ImageCache()
 
         theme_list = self.query_one("#theme-list", Themes)
         current_theme = theme_list.get_current_theme()
         if current_theme:
-            if current_theme in self.image_cache.cache:
-                del self.image_cache.cache[current_theme]
-                self.image_cache.access_order.remove(current_theme)
+            cache_key = self._get_cache_key(current_theme)
+            if cache_key in self.image_cache.cache:
+                del self.image_cache.cache[cache_key]
+                self.image_cache.access_order.remove(cache_key)
             self.load_theme_image(current_theme)
             self.notify(
                 "Configuration applied successfully",
@@ -489,34 +434,7 @@ class App(TextualApp):
         Restores all UI controls and internal settings to their original
         default state and provides user confirmation of the action.
         """
-        sample_slider = self.query_one("#sampling-size-control", Slider)
-        colors_slider = self.query_one("#color-count-control", Slider)
-        iter_slider = self.query_one("#max-iterations-control", Slider)
-        brightness_checkbox = self.query_one("#preserve-brightness-checkbox", Checkbox)
-
-        sample_slider.value = self.DEFAULT_SAMPLING_SIZE
-        colors_slider.value = self.DEFAULT_COLOR_COUNT
-        iter_slider.value = self.DEFAULT_MAX_ITERATIONS
-        brightness_checkbox.value = self.DEFAULT_PRESERVE_BRIGHTNESS
-
-        self.sampling_size = self.DEFAULT_SAMPLING_SIZE
-        self.color_count = self.DEFAULT_COLOR_COUNT
-        self.max_iterations = self.DEFAULT_MAX_ITERATIONS
-        self.preserve_brightness = self.DEFAULT_PRESERVE_BRIGHTNESS
-
-        sample_label = self.query_one("#sampling-size-value", Label)
-        colors_label = self.query_one("#color-count-value", Label)
-        iter_label = self.query_one("#max-iterations-value", Label)
-
-        sample_label.update(f"{self.DEFAULT_SAMPLING_SIZE} pixels")
-        colors_label.update(f"{self.DEFAULT_COLOR_COUNT} colors")
-        iter_label.update(f"{self.DEFAULT_MAX_ITERATIONS}")
-
-        settings_panel = self.query_one("#settings-panel", Settings)
-        settings_panel.sampling_size = self.DEFAULT_SAMPLING_SIZE
-        settings_panel.color_count = self.DEFAULT_COLOR_COUNT
-        settings_panel.max_iterations = self.DEFAULT_MAX_ITERATIONS
-        settings_panel.preserve_brightness = self.DEFAULT_PRESERVE_BRIGHTNESS
+        self.settings_component.reset_defaults()
 
         self.notify(
             "Settings restored to default values", timeout=NOTIFICATION_TIMEOUT_SECONDS
@@ -531,7 +449,8 @@ class App(TextualApp):
                 idx = current_idx + offset
                 if 0 <= idx < len(theme_list.filtered_themes):
                     theme_name = theme_list.filtered_themes[idx]
-                    if not self.image_cache.get(theme_name):
+                    cache_key = self._get_cache_key(theme_name)
+                    if not self.image_cache.get(cache_key):
                         self.executor.submit(self._process_theme_background, theme_name)
         except ValueError:
             pass
@@ -548,7 +467,8 @@ class App(TextualApp):
             idx = current_idx + offset
             if 0 <= idx < len(theme_list.filtered_themes):
                 theme_name = theme_list.filtered_themes[idx]
-                if not self.image_cache.get(theme_name):
+                cache_key = self._get_cache_key(theme_name)
+                if not self.image_cache.get(cache_key):
                     self.executor.submit(self._process_theme_background, theme_name)
 
     def action_save(self) -> None:
