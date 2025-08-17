@@ -1,14 +1,12 @@
 """Main application component for the color schemer."""
 
-import pathlib
-import subprocess
-import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from typing import Any
 
 import numpy as np
+import pyperclipimg
 import requests
 from PIL import Image
 from textual.app import App as TextualApp
@@ -487,27 +485,8 @@ class App(TextualApp):
         preview = self.query_one("#image-preview", Preview)
         if preview.current_image:
             try:
-                with tempfile.NamedTemporaryFile(
-                    suffix=".png",
-                    delete=False,
-                ) as tmp_file:
-                    preview.current_image.save(
-                        tmp_file.name,
-                        optimize=False,
-                        compress_level=0,
-                    )
-
-                    tmp_path = pathlib.Path(tmp_file.name)
-                    with tmp_path.open("rb") as f:
-                        subprocess.Popen(
-                            ["/usr/bin/wl-copy", "--type", "image/png"],
-                            stdin=f,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                            close_fds=True,
-                        )
-                    self.notify("Copied to clipboard!", severity="information")
+                pyperclipimg.copy(preview.current_image)
+                self.notify("Copied to clipboard!", severity="information")
             except Exception as e:
                 self.notify(f"Copy failed: {e}", severity="error")
 

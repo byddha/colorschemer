@@ -5,7 +5,8 @@ description = "A tool for recoloring images using color schemes"
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.3.2",
-    "pillow>=9.1,<11.0",
+    "pillow>=9.1",
+    "pyperclipimg>=0.1.0",
     "requests>=2.32.4",
     "scikit-learn>=1.7.1",
     "textual>=1.0.0",
