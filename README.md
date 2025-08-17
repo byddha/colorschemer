@@ -1,6 +1,12 @@
 # colorschemer
 
-TUI for recoloring images using common colorschemes. There are 424 colorschemes available with default settings
+TUI for recoloring images using common colorschemes. There are 424 colorschemes available with default settings. Uses K-means clustering to map colors by brightness, maybe other algorithms later.
+
+## Install
+
+```bash
+uv tool install git+https://github.com/drzbida/colorschemer/
+```
 
 ## Usage
 
