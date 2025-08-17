@@ -36,7 +36,7 @@ wheels = [
 [[package]]
 name = "colorschemer"
 version = "1.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "numpy" },
     { name = "pillow" },

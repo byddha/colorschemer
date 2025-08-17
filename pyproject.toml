@@ -35,6 +35,9 @@ ignore = [
     "RUF012",    # Mutable class attributes (textual pattern)
 ]
 
+[tool.uv]
+package = true
+
 [tool.setuptools]
 packages = ["colorschemer"]
 
