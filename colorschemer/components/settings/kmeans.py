@@ -45,7 +45,7 @@ class KmeansSettings(Container):
                     )
 
                 with Container(classes="parameter-control-group"):
-                    yield Label("Color Count", classes="parameter-label")
+                    yield Label("Clusters", classes="parameter-label")
                     yield Slider(
                         min=4,
                         max=16,
@@ -53,7 +53,7 @@ class KmeansSettings(Container):
                         step=1,
                         id="color-count-control",
                     )
-                    yield Label(f"{self.color_count} colors", id="color-count-value")
+                    yield Label(f"{self.color_count} clusters", id="color-count-value")
 
                 with Container(classes="parameter-control-group"):
                     yield Label("Max Iterations", classes="parameter-label")
@@ -112,7 +112,7 @@ class KmeansSettings(Container):
             color_slider = self.query_one("#color-count-control", Slider)
             color_slider.value = kwargs["n_colors"]
             color_label = self.query_one("#color-count-value", Label)
-            color_label.update(f"{kwargs['n_colors']} colors")
+            color_label.update(f"{kwargs['n_colors']} clusters")
 
         if "max_iterations" in kwargs:
             self.max_iterations = kwargs["max_iterations"]
