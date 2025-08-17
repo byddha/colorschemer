@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 def load_color_schemes(theme_file: str = "iterm2") -> dict:
     """Load color schemes from specified theme file with proper path resolution."""
-    script_dir = pathlib.Path(__file__).parent.parent
+    script_dir = pathlib.Path(__file__).parent
     themes_path = script_dir / "assets" / "themes" / f"{theme_file}.json"
 
     try:

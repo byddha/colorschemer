@@ -40,7 +40,14 @@ ignore = [
 package = true
 
 [tool.setuptools]
-packages = ["colorschemer"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["colorschemer*"]
+
+[tool.setuptools.package-data]
+"colorschemer" = ["assets/themes/*.json", "assets/themes/*/*.json"]
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
