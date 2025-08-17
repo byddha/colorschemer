@@ -1,6 +1,9 @@
 # colorschemer
 
-TUI for recoloring images using common colorschemes. There are 424 colorschemes available with default settings. Uses K-means clustering to map colors by brightness, maybe other algorithms later.
+TUI for recoloring images using common colorschemes. There are 424 colorschemes available with default settings. Uses K-means clustering to map colors by brightness, maybe other algorithms later / improve current one. For now I got the wallpapers i wanted :) 
+
+## Requirements
+Terminal with good image rendering support (kitty terminal graphics protocol or Sixel)
 
 ## Install
 
