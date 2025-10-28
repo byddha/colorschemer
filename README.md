@@ -8,7 +8,7 @@ Terminal with good image rendering support (kitty terminal graphics protocol or 
 ## Install
 
 ```bash
-uv tool install git+https://github.com/drzbida/colorschemer/
+uv tool install git+https://github.com/byddha/colorschemer/
 ```
 
 ## Usage
